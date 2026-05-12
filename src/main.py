@@ -1,5 +1,5 @@
 import os
-import anthropic
+import openai
 from datetime import date
 from pathlib import Path
 
@@ -40,17 +40,21 @@ def run_pipeline(
     all_items = assign_weights(all_items, cfg)
     all_items = sort_items(all_items)
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    api_key = os.environ.get("DASHSCOPE_API_KEY", "") or cfg.get("ai", {}).get("api_key", "")
     ai_cfg = cfg.get("ai", {})
-    model = ai_cfg.get("model", "claude-sonnet-4-6")
+    model = ai_cfg.get("model", "qwen3.6-plus")
+    base_url = ai_cfg.get("base_url", "")
     language = ai_cfg.get("language", "zh")
 
     if api_key:
-        client = anthropic.Anthropic(api_key=api_key)
+        kwargs = {"api_key": api_key}
+        if base_url:
+            kwargs["base_url"] = base_url
+        client = openai.OpenAI(**kwargs)
         all_items = summarize_items(all_items, client=client, model=model, language=language)
         intro = generate_daily_intro(all_items, client=client, model=model, language=language)
     else:
-        intro = "（AI 摘要未启用，请配置 ANTHROPIC_API_KEY）"
+        intro = "（AI 摘要未启用，请配置 api_key）"
 
     today = date.today().isoformat()
     daily_html = render_daily_page(

@@ -16,7 +16,9 @@ sources:
   twitter: true
 
 ai:
-  model: claude-sonnet-4-6
+  model: qwen3.6-plus
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  api_key: sk-d68acf64f9b14b4c8e84862add00931b
   language: zh
 
 schedule:
