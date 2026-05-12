@@ -14,6 +14,10 @@ sources:
   atp_wta: true
   youtube: true
   twitter: true
+  instagram: true
+
+content:
+  recency_days: 3
 
 ai:
   model: qwen3.6-plus
