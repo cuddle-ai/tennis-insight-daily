@@ -1,0 +1,23 @@
+players:
+  - Jannik Sinner
+  - Carlos Alcaraz
+  - Zheng Qinwen
+
+tournaments:
+  - Roland Garros
+  - Wimbledon
+  - US Open
+  - Australian Open
+
+sources:
+  news: true
+  atp_wta: true
+  youtube: true
+  twitter: true
+
+ai:
+  model: claude-sonnet-4-6
+  language: zh
+
+schedule:
+  publish_time: "07:00"
