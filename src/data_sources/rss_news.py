@@ -3,11 +3,8 @@ from datetime import datetime, timezone
 from .base import BaseDataSource, NewsItem
 
 RSS_SOURCES = [
-    {"name": "Tennis.com",       "url": "https://www.tennis.com/rss/"},
-    {"name": "ATP Tour",         "url": "https://www.atptour.com/en/media/rss-feed/xml-feed"},
-    {"name": "WTA Tour",         "url": "https://www.wtatennis.com/rss.xml"},
-    {"name": "Tennis World USA", "url": "https://www.tennisworldusa.org/rss/news.xml"},
-    {"name": "We Are Tennis",    "url": "https://www.wearetennis.com/rss"},
+    {"name": "BBC Sport",       "url": "https://feeds.bbci.co.uk/sport/tennis/rss.xml"},
+    {"name": "ESPN Tennis",     "url": "https://www.espn.com/espn/rss/tennis/news"},
 ]
 
 
