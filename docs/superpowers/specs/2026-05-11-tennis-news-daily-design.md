@@ -94,7 +94,7 @@ class BaseDataSource:
 - 按 `config.yaml` 中配置的球员/赛事关键词过滤不相关内容
 
 **步骤二：AI 摘要生成**
-- 调用 Claude API（`claude-sonnet-4-6`）
+- 调用通义千问（OpenAI 兼容接口，`openai` SDK，百炼平台）
 - 每条新闻生成 2-3 句中文摘要
 - 全篇生成一段"今日导读"（3-5 句，概括当天最重要的事）
 - Prompt 风格：简洁、客观、适合早间快读
@@ -229,7 +229,7 @@ tennis-news-daily/
 5. GitHub Pages 自动发布
 
 **Secrets 配置（GitHub Repository Secrets）：**
-- `ANTHROPIC_API_KEY`
+- `DASHSCOPE_API_KEY`
 - `YOUTUBE_API_KEY`
 
 ---
@@ -243,7 +243,7 @@ tennis-news-daily/
 | 网页抓取 | `trafilatura` |
 | YouTube | `google-api-python-client` |
 | X 抓取 | `snscrape` |
-| AI 摘要 | `anthropic` SDK |
+| AI 摘要 | `openai` SDK（通义千问 qwen3.6-plus，百炼平台） |
 | HTML 渲染 | `Jinja2` |
 | 去重 | `difflib` |
 | 定时触发 | GitHub Actions |
