@@ -20,5 +20,5 @@ def filter_by_config(items: list[NewsItem], cfg: dict, section: str) -> list[New
     return [
         item for item in items
         if any(kw in item.title.lower() for kw in keywords)
-        or item.media_type in ("match_result", "schedule", "video", "tweet")
+        or item.media_type in ("match_result", "schedule", "video", "tweet", "instagram")
     ]

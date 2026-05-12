@@ -8,7 +8,7 @@ from src.data_sources.rss_news import build_rss_sources
 from src.data_sources.atp_wta import build_atp_wta_sources
 from src.data_sources.youtube import build_youtube_source
 from src.data_sources.twitter import build_twitter_source
-from src.data_sources.instagram import build_instagram_source
+from src.data_sources.apify_instagram import build_apify_instagram_source
 from src.processor.dedup import dedup_items
 from src.processor.filter import filter_by_config
 from src.processor.recency import filter_by_days
@@ -32,7 +32,7 @@ def run_pipeline(
         + build_atp_wta_sources(cfg)
         + build_youtube_source(cfg)
         + build_twitter_source(cfg)
-        + build_instagram_source(cfg)
+        + build_apify_instagram_source(cfg)
     )
     all_items = []
     for source in sources:
