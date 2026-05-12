@@ -1,8 +1,29 @@
+from datetime import datetime, timedelta, timezone
 from src.data_sources.base import NewsItem
 
 GRAND_SLAMS = {"Roland Garros", "Wimbledon", "US Open", "Australian Open"}
 MASTERS = {"Indian Wells", "Miami", "Monte Carlo", "Madrid", "Rome",
            "Canada", "Cincinnati", "Shanghai", "Paris"}
+
+
+def _recency_bonus(published_at: str) -> int:
+    """根据发布时间计算时效性加权：24h内+15，3天内+5"""
+    try:
+        raw = published_at
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        dt = datetime.fromisoformat(raw)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        delta = now - dt
+        if delta < timedelta(hours=24):
+            return 15
+        if delta < timedelta(days=3):
+            return 5
+        return 0
+    except Exception:
+        return 0
 
 
 def assign_weights(items: list[NewsItem], cfg: dict) -> list[NewsItem]:
@@ -33,6 +54,8 @@ def assign_weights(items: list[NewsItem], cfg: dict) -> list[NewsItem]:
 
         if item.media_type == "schedule":
             w += 35
+
+        w += _recency_bonus(item.published_at)
 
         item.weight = w
     return items
