@@ -14,7 +14,7 @@ def render_daily_page(
     headlines = [i for i in items if i.media_type == "article"][:5]
     match_results = [i for i in items if i.media_type == "match_result"]
     schedules = [i for i in items if i.media_type == "schedule"]
-    social_items = [i for i in items if i.media_type in ("video", "tweet")]
+    social_items = [i for i in items if i.media_type in ("video", "tweet", "instagram")]
     player_news = [i for i in items if i.media_type == "article" and i not in headlines
                    and any(p for p in i.players)][:5]
     more_news = [i for i in items if i.media_type == "article"

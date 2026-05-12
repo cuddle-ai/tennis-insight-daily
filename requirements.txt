@@ -1,7 +1,8 @@
 feedparser==6.0.11
 trafilatura==1.12.2
 google-api-python-client==2.131.0
-snscrape==0.7.0.20230622
+playwright>=1.0.0
+apify-client>=1.0.0
 openai>=1.0.0
 Jinja2==3.1.4
 PyYAML==6.0.2

@@ -18,8 +18,11 @@ MOCK_SEARCH_RESPONSE = {
     ]
 }
 
+
 def test_youtube_fetch_returns_news_items():
-    source = YouTubeSource(api_key="fake_key", query="tennis Roland Garros", max_results=3)
+    source = YouTubeSource(
+        api_key="fake_key", channel_ids=["UCY_5h5zaSwN7Or4kIJDYNXA"], max_results=3
+    )
     mock_service = MagicMock()
     mock_service.search().list().execute.return_value = MOCK_SEARCH_RESPONSE
     with patch("src.data_sources.youtube.build", return_value=mock_service):
@@ -30,8 +33,11 @@ def test_youtube_fetch_returns_news_items():
     assert "abc123" in items[0].embed_html
     assert items[0].image_url == "https://img.youtube.com/vi/abc123/hqdefault.jpg"
 
+
 def test_youtube_fetch_returns_empty_on_error():
-    source = YouTubeSource(api_key="bad_key", query="tennis", max_results=3)
+    source = YouTubeSource(
+        api_key="bad_key", channel_ids=["UCY_5h5zaSwN7Or4kIJDYNXA"], max_results=3
+    )
     with patch("src.data_sources.youtube.build", side_effect=Exception("API error")):
         items = source.fetch()
     assert items == []
