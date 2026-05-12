@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tennis News Daily — {{ date }}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+           max-width: 860px; margin: 0 auto; padding: 1.5rem; color: #1a1a1a; }
+    h1 { font-size: 1.6rem; border-bottom: 3px solid #2e7d32; padding-bottom: .5rem; }
+    h2 { font-size: 1.1rem; color: #2e7d32; margin-top: 2rem; }
+    .intro { background: #f1f8e9; border-left: 4px solid #2e7d32;
+             padding: .8rem 1rem; margin: 1rem 0; border-radius: 0 4px 4px 0; }
+    .card { display: flex; gap: 1rem; margin: 1rem 0; padding: 1rem;
+            border: 1px solid #e0e0e0; border-radius: 6px; }
+    .card img { width: 120px; height: 80px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+    .card-body h3 { margin: 0 0 .4rem; font-size: 1rem; }
+    .card-body p { margin: 0 0 .4rem; font-size: .9rem; color: #444; }
+    .card-meta { font-size: .8rem; color: #888; }
+    .card-meta a { color: #2e7d32; text-decoration: none; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { padding: .5rem .75rem; border: 1px solid #e0e0e0; text-align: left; }
+    th { background: #f5f5f5; }
+    .embed-wrap { margin: 1rem 0; }
+    .embed-wrap iframe { max-width: 100%; border-radius: 6px; }
+    .more-list { list-style: none; padding: 0; }
+    .more-list li { padding: .4rem 0; border-bottom: 1px solid #f0f0f0; font-size: .9rem; }
+    .more-list a { color: #1a1a1a; text-decoration: none; }
+    .more-list a:hover { color: #2e7d32; }
+    nav { margin-top: 2rem; font-size: .85rem; color: #888; }
+    nav a { color: #2e7d32; text-decoration: none; margin-right: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Tennis News Daily — {{ date }}</h1>
+
+  {% if intro %}
+  <div class="intro">{{ intro }}</div>
+  {% endif %}
+
+  {% if headlines %}
+  <h2>头条新闻</h2>
+  {% for item in headlines %}
+  <div class="card">
+    {% if item.image_url %}<img src="{{ item.image_url }}" alt="">{% endif %}
+    <div class="card-body">
+      <h3>{{ item.title }}</h3>
+      {% if item.summary %}<p>{{ item.summary }}</p>{% endif %}
+      <div class="card-meta">{{ item.source }} · <a href="{{ item.url }}" target="_blank">阅读原文 →</a></div>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if match_results or schedules %}
+  <h2>赛事动态</h2>
+  {% if match_results %}
+  <h3 style="font-size:.95rem;color:#555;">昨日结果</h3>
+  <table>
+    <tr><th>比赛</th></tr>
+    {% for item in match_results %}
+    <tr><td>{{ item.title }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  {% if schedules %}
+  <h3 style="font-size:.95rem;color:#555;margin-top:1rem;">今日赛程</h3>
+  <table>
+    <tr><th>赛程</th></tr>
+    {% for item in schedules %}
+    <tr><td>{{ item.title }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  {% endif %}
+
+  {% if player_news %}
+  <h2>球员动态</h2>
+  {% for item in player_news %}
+  <div class="card">
+    {% if item.image_url %}<img src="{{ item.image_url }}" alt="">{% endif %}
+    <div class="card-body">
+      <h3>{{ item.title }}</h3>
+      {% if item.summary %}<p>{{ item.summary }}</p>{% endif %}
+      <div class="card-meta">{{ item.source }} · <a href="{{ item.url }}" target="_blank">阅读原文 →</a></div>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if social_items %}
+  <h2>社交精选</h2>
+  {% for item in social_items %}
+  <div class="embed-wrap">
+    {% if item.embed_html %}{{ item.embed_html | safe }}{% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if more_news %}
+  <h2>更多新闻</h2>
+  <ul class="more-list">
+    {% for item in more_news %}
+    <li><a href="{{ item.url }}" target="_blank">{{ item.title }}</a>
+        <span style="color:#aaa;font-size:.8rem;"> — {{ item.source }}</span></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <nav>
+    <a href="index.html">← 历史归档</a>
+  </nav>
+</body>
+</html>
