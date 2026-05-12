@@ -8,8 +8,10 @@ from src.data_sources.rss_news import build_rss_sources
 from src.data_sources.atp_wta import build_atp_wta_sources
 from src.data_sources.youtube import build_youtube_source
 from src.data_sources.twitter import build_twitter_source
+from src.data_sources.instagram import build_instagram_source
 from src.processor.dedup import dedup_items
 from src.processor.filter import filter_by_config
+from src.processor.recency import filter_by_days
 from src.processor.sorter import assign_weights, sort_items
 from src.processor.ai_summary import summarize_items, generate_daily_intro
 from src.renderer.daily_page import render_daily_page
@@ -30,6 +32,7 @@ def run_pipeline(
         + build_atp_wta_sources(cfg)
         + build_youtube_source(cfg)
         + build_twitter_source(cfg)
+        + build_instagram_source(cfg)
     )
     all_items = []
     for source in sources:
@@ -37,6 +40,8 @@ def run_pipeline(
 
     all_items = dedup_items(all_items, threshold=0.8)
     all_items = filter_by_config(all_items, cfg, section="players")
+    recency_days = cfg.get("content", {}).get("recency_days", 3)
+    all_items = filter_by_days(all_items, days=recency_days)
     all_items = assign_weights(all_items, cfg)
     all_items = sort_items(all_items)
 
