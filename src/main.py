@@ -167,7 +167,8 @@ def run_pipeline(
         try:
             all_items = summarize_items(all_items, client=client, model=model, language=language)
             intro = generate_daily_intro(all_items, client=client, model=model, language=language)
-        except Exception:
+        except Exception as exc:
+            print(f"AI summary failed: {exc}")
             intro = "（AI 摘要生成失败，已保留原始内容）"
     else:
         intro = "（AI 摘要未启用，请配置 api_key）"
