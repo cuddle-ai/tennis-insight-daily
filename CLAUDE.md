@@ -12,27 +12,28 @@ playwright install chromium
 # 运行测试
 pytest tests/ -v
 
-# 单个测试文件
-pytest tests/test_twitter.py -v
-
-# 运行每日日报生成
+# 运行日报生成（默认采集昨天，北京时间）
 python src/main.py
 
-# GitHub Actions 手动触发
-gh workflow run daily.yml
+# 指定日期
+TARGET_DATE=2026-05-15 python src/main.py
 ```
 
 ## 架构概述
 
-项目是每日网球资讯聚合器，通过 GitHub Actions 定时运行，数据经 AI 总结后输出到 GitHub Pages。
+每日网球资讯聚合器，T-1 模式采集前一天（北京时间）资讯，经 AI 总结后输出静态 HTML。
 
 ```
 数据源 (data_sources/) → 处理器 (processor/) → 渲染器 (renderer/)
      ↓                      ↓                  ↓
   fetch() 返回          dedup → filter →    Jinja2 模板
-  list[NewsItem]        recency → sort →     输出 HTML
+  list[NewsItem]        date_range → sort →  输出 HTML
                         weight → summarize
 ```
+
+### T-1 模式
+
+日期边界以北京时间（UTC+8）为准。例如 5 月 17 日的日报覆盖 UTC 5/16 16:00 ~ 5/17 16:00 的资讯。可通过 `TARGET_DATE` 环境变量指定任意日期。
 
 ### 数据源注册模式
 
@@ -66,10 +67,10 @@ class NewsItem:
 ### 处理器链
 
 `src/main.py` 中的处理顺序：
-1. `dedup_items` — 标题相似度去重（threshold=0.8）
-2. `filter_by_config` — 按 config.yaml 中的 players/tournaments 过滤
-3. `filter_by_days` — 超过 `content.recency_days` 的内容丢弃
-4. `assign_weights` — 按媒体类型 + 赛事级别 + 关注球员 + 时效加权
+1. `trace_dedup` — 标题相似度去重（threshold=0.8）
+2. `filter_by_config` — 按 players/tournaments 过滤（当前为 no-op，仅作排序信号）
+3. `trace_date_range` — T-1 日期范围过滤，只保留目标日期的条目
+4. `assign_weights` — 按媒体类型 + 赛事级别 + 关注球员加权
 5. `sort_items` — 按 weight 降序
 6. `summarize_items` + `generate_daily_intro` — AI 总结（如有 API key）
 7. `render_daily_page` — 渲染 daily.html
@@ -81,26 +82,19 @@ class NewsItem:
 - 媒体类型：match_result > schedule > video > tweet/instagram
 - 赛事级别：四大满贯 > Masters 1000 > 其他
 - 关注球员：标题中出现 +50，任意位置出现 +20
-- 时效加成：24小时内 +15，3天内 +5
 
 ### AI 集成
 
-使用 OpenAI 兼容接口（阿里 DashScope），模型 `qwen3.6-max-preview`。由 `ai.language` 控制输出语言（`"zh"` / `"en"`）。无 API key 时优雅降级，跳过总结步骤。
+使用 OpenAI 兼容接口（阿里 DashScope），模型 `qwen3.6-max-preview`。由 `AI_LANGUAGE` 控制输出语言（`"zh"` / `"en"`）。无 API key 时优雅降级，跳过总结步骤。
 
-### 配置结构
+### 配置
 
-`config.yaml` 控制所有行为：
-- `players` / `tournaments` — 过滤和加权依据
-- `sources.*` — 各数据源开关
-- `content.recency_days` — 时效阈值（默认 3 天）
-- `ai.*` — 模型和语言设置
-
-## 安全注意
-
-`config.yaml` 中包含 `ai.api_key`，已提交到 git 仓库。请勿将密钥提交到远程。
+配置通过 `.env` 文件（本地）或环境变量（远端）加载，`src/config.py` 合并两个来源（环境变量优先）。密钥类配置通过环境变量注入，不写入代码。
 
 ## 注意事项
 
 - Twitter 抓取依赖 Playwright + JS 注入（`twitter.py` 中的 `_SCRAPE_JS`），x.com 未登录只显示固定推文（约 2020-2022 年）
 - `instagram.py`（直接抓取）从未在 pipeline 中使用，Instagram 仅通过 Apify 获取
-- 所有测试文件使用 pytest，使用 `unittest.mock.patch` 隔离外部依赖
+- 所有测试使用 pytest + `unittest.mock.patch` 隔离外部依赖
+- `src/time_utils.py` 提供时间解析和日期范围过滤，日期边界基于北京时间（UTC+8）
+- `src/debug_report.py` 提供 pipeline 各阶段追踪和调试报告（`DEBUG_REPORT_ENABLED=true` 开启）

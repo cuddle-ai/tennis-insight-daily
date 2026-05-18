@@ -1,32 +1,29 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
+
 from src.data_sources.base import NewsItem
+from src.time_utils import parse_datetime
 
 GRAND_SLAMS = {"Roland Garros", "Wimbledon", "US Open", "Australian Open"}
 MASTERS = {"Indian Wells", "Miami", "Monte Carlo", "Madrid", "Rome",
            "Canada", "Cincinnati", "Shanghai", "Paris"}
 
 
-def _recency_bonus(published_at: str) -> int:
-    """根据发布时间计算时效性加权：24h内+15，3天内+5"""
-    try:
-        raw = published_at
-        if raw.endswith("Z"):
-            raw = raw[:-1] + "+00:00"
-        dt = datetime.fromisoformat(raw)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        now = datetime.now(timezone.utc)
-        delta = now - dt
-        if delta < timedelta(hours=24):
-            return 15
-        if delta < timedelta(days=3):
-            return 5
+def _recency_bonus(published_at: str, target: date) -> int:
+    """Bonus for items published later in the target day (afternoon > morning)."""
+    dt = parse_datetime(published_at)
+    if dt is None:
         return 0
-    except Exception:
-        return 0
+    # Items published after 18:00 UTC on the target day get extra weight
+    afternoon_cutoff = datetime(target.year, target.month, target.day, 18, tzinfo=timezone.utc)
+    if dt >= afternoon_cutoff:
+        return 10
+    return 0
 
 
-def assign_weights(items: list[NewsItem], cfg: dict) -> list[NewsItem]:
+def assign_weights(items: list[NewsItem], cfg: dict, target: date | None = None) -> list[NewsItem]:
+    if target is None:
+        target = date.today() - timedelta(days=1)
+
     followed_players = {p.lower() for p in cfg.get("players", [])}
     followed_tournaments = {t.lower() for t in cfg.get("tournaments", [])}
 
@@ -55,7 +52,7 @@ def assign_weights(items: list[NewsItem], cfg: dict) -> list[NewsItem]:
         if item.media_type == "schedule":
             w += 35
 
-        w += _recency_bonus(item.published_at)
+        w += _recency_bonus(item.published_at, target)
 
         item.weight = w
     return items
