@@ -219,6 +219,5 @@ def build_twitter_source(cfg: dict) -> list[TwitterSource]:
     if not cfg.get("sources", {}).get("twitter", True):
         return []
     players = cfg.get("players", [])
-    recency_days = cfg.get("content", {}).get("recency_days", 3)
     usernames = _build_twitter_usernames(players)
-    return [TwitterSource(usernames=usernames, max_results=10, since_days=recency_days)]
+    return [TwitterSource(usernames=usernames, max_results=10, since_days=2)]
