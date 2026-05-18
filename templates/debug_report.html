@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>网球资讯调试报告 — {{ date }}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0 auto; max-width: 1280px; padding: 24px; color: #1f2937; background: #f8fafc; }
+    h1, h2, h3 { color: #0f172a; }
+    .muted { color: #64748b; font-size: 14px; }
+    .panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin: 16px 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .metric { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+    .metric strong { display: block; font-size: 20px; margin-bottom: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { border: 1px solid #e2e8f0; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #f1f5f9; }
+    code { background: #eef2ff; padding: 1px 4px; border-radius: 4px; }
+    .pill { display: inline-block; background: #dbeafe; color: #1d4ed8; border-radius: 999px; padding: 2px 8px; margin: 2px 6px 2px 0; font-size: 12px; }
+    .item-list { display: grid; gap: 10px; }
+    .item { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #fff; }
+    .item h4 { margin: 0 0 8px; font-size: 15px; }
+    .reason { color: #b91c1c; font-weight: 600; }
+    summary { cursor: pointer; font-weight: 600; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h1>调试报告 — {{ date }}</h1>
+  <div class="muted">生成时间 {{ generated_at }} · 配置 <code>{{ config_path }}</code> · 输出 <code>{{ output_path }}</code></div>
+
+  <div class="panel">
+    <h2>运行概览</h2>
+    <div class="grid">
+      {% for key, value in debug_meta.items() %}
+      <div class="metric">
+        <strong>{{ value }}</strong>
+        <span>{{ key }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>数据源采集</h2>
+    <table>
+      <tr>
+        <th>数据源</th>
+        <th>状态</th>
+        <th>耗时</th>
+        <th>条目数</th>
+        <th>媒体类型</th>
+        <th>错误</th>
+      </tr>
+      {% for trace in source_traces %}
+      <tr>
+        <td>{{ trace.name }}</td>
+        <td>{{ trace.status }}</td>
+        <td>{{ trace.duration_seconds }}s</td>
+        <td>{{ trace.summary.count }}</td>
+        <td>
+          {% for media_type, count in trace.summary.media_types.items() %}
+          <span class="pill">{{ media_type }}: {{ count }}</span>
+          {% endfor %}
+        </td>
+        <td>{{ trace.error or '' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% for trace in source_traces %}
+    <details>
+      <summary>{{ trace.name }} 条目清单（{{ trace.summary.count }}）</summary>
+      <div class="item-list">
+        {% for item in trace["items"] %}
+        <div class="item">
+          <h4>{{ item.title }}</h4>
+          <div class="muted">{{ item.source }} · {{ item.media_type }} · {{ item.published_at }}</div>
+          <div><a href="{{ item.url }}" target="_blank">{{ item.url }}</a></div>
+        </div>
+        {% endfor %}
+      </div>
+    </details>
+    {% if trace.diagnostics %}
+    <details>
+      <summary>{{ trace.name }} 诊断明细（{{ trace.diagnostics|length }}）</summary>
+      <div class="item-list">
+        {% for diag in trace.diagnostics %}
+        <div class="item">
+          {% for key, value in diag.items() %}
+          <div><strong>{{ key }}</strong>: {{ value }}</div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+    {% endfor %}
+  </div>
+
+  {% for stage in stage_traces %}
+  <div class="panel">
+    <h2>{{ stage.name }}</h2>
+    <div class="grid">
+      <div class="metric"><strong>{{ stage.input_summary.count }}</strong><span>Input</span></div>
+      <div class="metric"><strong>{{ stage.output_summary.count }}</strong><span>Output</span></div>
+      <div class="metric"><strong>{{ stage.removed|length }}</strong><span>Removed</span></div>
+      {% if stage.since %}
+      <div class="metric"><strong>{{ stage.since }}</strong><span>Since</span></div>
+      {% endif %}
+    </div>
+    <p class="muted">{{ stage.description }}</p>
+    <details>
+      <summary>输入条目（{{ stage.input_items|length }}）</summary>
+      <div class="item-list">
+        {% for item in stage.input_items %}
+        <div class="item">
+          <h4>{{ item.title }}</h4>
+          <div class="muted">{{ item.source }} · {{ item.media_type }} · {{ item.published_at }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </details>
+    <details>
+      <summary>输出条目（{{ stage.output_items|length }}）</summary>
+      <div class="item-list">
+        {% for item in stage.output_items %}
+        <div class="item">
+          <h4>{{ item.title }}</h4>
+          <div class="muted">{{ item.source }} · {{ item.media_type }} · {{ item.published_at }} · weight {{ item.weight }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </details>
+    {% if stage.removed %}
+    <details open>
+      <summary>被移除条目（{{ stage.removed|length }}）</summary>
+      <div class="item-list">
+        {% for removed in stage.removed %}
+        <div class="item">
+          <h4>{{ removed.item.title }}</h4>
+          <div><span class="reason">{{ removed.reason }}</span></div>
+          <div class="muted">{{ removed.item.source }} · {{ removed.item.media_type }} · {{ removed.item.published_at }}</div>
+          {% if removed.duplicate_of %}
+          <div>Duplicate of: <code>{{ removed.duplicate_of.title }}</code> (similarity {{ removed.similarity }})</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <div class="panel">
+    <h2>渲染结果拆解</h2>
+    <div class="grid">
+      {% for name, count in render_trace.counts.items() %}
+      <div class="metric"><strong>{{ count }}</strong><span>{{ name }}</span></div>
+      {% endfor %}
+    </div>
+    {% for name, items in render_trace.partitions.items() %}
+    <details>
+      <summary>{{ name }} ({{ items|length }})</summary>
+      <div class="item-list">
+        {% for item in items %}
+        <div class="item">
+          <h4>{{ item.title }}</h4>
+          <div class="muted">{{ item.source }} · {{ item.media_type }} · {{ item.published_at }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </details>
+    {% endfor %}
+    {% if render_trace.excluded %}
+    <details open>
+      <summary>未进入最终页面（{{ render_trace.excluded|length }}）</summary>
+      <div class="item-list">
+        {% for excluded in render_trace.excluded %}
+        <div class="item">
+          <h4>{{ excluded.item.title }}</h4>
+          <div><span class="reason">{{ excluded.reason }}</span></div>
+          <div class="muted">{{ excluded.item.source }} · {{ excluded.item.media_type }} · {{ excluded.item.published_at }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+  </div>
+</body>
+</html>
