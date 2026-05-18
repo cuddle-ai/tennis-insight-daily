@@ -1,134 +1,91 @@
 # Tennis Insight Daily
 
-每日 AI 网球资讯聚合器，自动抓取多个来源的新闻并通过 AI 生成摘要，输出为静态 HTML 页面，部署至 GitHub Pages。
+每日 AI 网球资讯聚合器。T-1 模式采集前一天（北京时间）的资讯，经去重、加权排序、AI 摘要后输出为静态 HTML 页面。
 
 ![Python](https://img.shields.io/badge/Python-3.11+-3c873a?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
-![Build](https://img.shields.io/github/actions/workflow/status/cuddle-ai/tennis-insight-daily/daily.yml?style=flat-square&label=Build)
 
-## Overview
+## Features
 
-Tennis Insight Daily 从以下来源自动聚合网球资讯：
+- **T-1 模式**：按北京时间日历日期采集，每天的内容边界清晰不重叠
+- **多源聚合**：RSS（BBC/ESPN）、ATP/WTA 赛果赛程、YouTube、Twitter/X、Instagram
+- **AI 摘要**：基于阿里 DashScope 生成每日导语和条目摘要
+- **调试报告**：pipeline 各阶段的完整追踪，便于排查数据问题
 
-- **RSS** — BBC Sport Tennis、ESPN Tennis
-- **ATP / WTA** — 赛果与今日赛程
-- **YouTube** — ATP Tour、WTA、四大满贯等官方频道
-- **X (Twitter)** — 官方机构与球员账号
-- **Instagram** — via Apify API
-
-所有内容经过去重、时效过滤、AI 加权排序后，由 AI 生成每日导语与摘要，最终输出为静态 HTML 并部署至 GitHub Pages。每天 UTC 23:00 自动运行。
-
-## Getting Started
-
-### 本地运行
+## Quick Start
 
 ```bash
 # 安装依赖
 pip install -r requirements.txt
 playwright install chromium
 
-# 运行日报生成
+# 复制配置模板并填入实际值
+cp .env.example .env
+
+# 运行（默认采集昨天）
 python src/main.py
+
+# 指定日期
+TARGET_DATE=2026-05-15 python src/main.py
 ```
 
 输出文件位于 `output/YYYY-MM-DD.html`。
 
-### 触发 GitHub Actions
-
-在仓库页面进入 **Actions → Daily Tennis News → Run workflow** 手动触发。
-
 ## Configuration
 
-编辑 `config.yaml` 即可配置关注球员、数据源开关、时效阈值与 AI 模型：
+所有配置通过环境变量或 `.env` 文件传入（环境变量优先）。
 
-```yaml
-players:                       # 用于内容过滤与权重加成
-  - Jannik Sinner
-  - Carlos Alcaraz
-  - Zheng Qinwen
-
-tournaments:
-  - Roland Garros
-  - Wimbledon
-  - US Open
-  - Australian Open
-
-sources:                      # 各数据源开关
-  news: true
-  atp_wta: true
-  youtube: true
-  twitter: true
-  instagram: true
-
-content:
-  recency_days: 3             # 保留最近 N 天的内容
-
-ai:
-  model: qwen3.6-max-preview
-  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
-  api_key: your-key           # 建议通过环境变量 DASHSCOPE_API_KEY 传入
-  language: zh                # 输出语言：zh 或 en
-```
-
-> [!WARNING]
-> `config.yaml` 中的 API Key 已提交到 Git。请勿将密钥推送至远程仓库。生产环境建议通过 GitHub Secrets 或环境变量注入。
-
-### 所需环境变量 / Secrets
-
-| Variable | 说明 |
-|---|---|
-| `YOUTUBE_API_KEY` | [YouTube Data API v3](https://console.cloud.google.com/apis/library/youtube.googleapis.com) 密钥 |
-| `APIFY_API_KEY` | [Apify](https://apify.com) 密钥（用于 Instagram 抓取） |
-| `DASHSCOPE_API_KEY` | 阿里云 DashScope API Key（AI 摘要，可选） |
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `PLAYERS` | 关注球员（逗号分隔） | 空 |
+| `TOURNAMENTS` | 关注赛事（逗号分隔） | 空 |
+| `SOURCES_NEWS` | 启用 RSS 新闻源 | `true` |
+| `SOURCES_ATP_WTA` | 启用 ATP/WTA 数据源 | `true` |
+| `SOURCES_YOUTUBE` | 启用 YouTube 数据源 | `true` |
+| `SOURCES_TWITTER` | 启用 Twitter 数据源 | `true` |
+| `SOURCES_INSTAGRAM` | 启用 Instagram 数据源 | `true` |
+| `CONTENT_HEADLINES_LIMIT` | 头条新闻上限 | `8` |
+| `CONTENT_SOCIAL_LIMIT` | 社交精选上限 | `5` |
+| `AI_MODEL` | AI 模型名称 | `qwen3.6-max-preview` |
+| `AI_BASE_URL` | OpenAI 兼容 API 地址 | 空 |
+| `AI_API_KEY` | API 密钥 | 空 |
+| `AI_LANGUAGE` | 输出语言 | `zh` |
+| `YOUTUBE_API_KEY` | YouTube Data API v3 密钥 | 空 |
+| `APIFY_API_KEY` | Apify API 密钥（Instagram） | 空 |
+| `TARGET_DATE` | 指定目标日期（YYYY-MM-DD） | 昨天（北京时间） |
+| `DEBUG_REPORT_ENABLED` | 生成调试报告 | `false` |
 
 ## Architecture
 
 ```
-config.yaml
-    │
-    ▼
-src/main.py  ──  Pipeline  ──  output/
-    │                               │
-    ├─ build_*_source(cfg)          │
-    │   fetch() → list[NewsItem]     │
-    │                               │
-    ├─ dedup_items()                │
-    ├─ filter_by_config()           │
-    ├─ filter_by_days()             │
-    ├─ assign_weights()             │   daily.html (当天日报)
-    ├─ sort_items()                │   index.html (归档索引)
-    ├─ summarize_items() (AI)       │
-    ├─ generate_daily_intro() (AI)  │
-    └─ render_daily_page()          ▼
+数据源 → 处理器 → 渲染器
+
+src/data_sources/          src/processor/           src/renderer/
+  fetch() → list[NewsItem]   dedup → filter →          Jinja2 模板
+                             date_range → sort →       输出 HTML
+                             weight → summarize
 ```
 
 **数据源** (`src/data_sources/`)：每个数据源实现 `BaseDataSource` 抽象类，提供 `fetch() -> list[NewsItem]` 方法，通过 `build_<name>_source(cfg)` 注册。
 
-**处理器** (`src/processor/`)：管道式处理链，包括去重、配置过滤、时效过滤、权重计算、AI 摘要。
+**处理器** (`src/processor/`)：管道式处理链，包括去重、配置过滤、日期范围过滤、权重计算、AI 摘要。
 
-**渲染器** (`src/renderer/`)：使用 Jinja2 模板将处理后的数据输出为 HTML。
+**渲染器** (`src/renderer/`)：Jinja2 模板输出 HTML。`daily_page.py` 生成日报，`index_page.py` 生成归档索引。
 
 ## Data Sources
 
 | Source | 文件 | 说明 |
 |---|---|---|
-| RSS | `rss_news.py` | BBC Sport + ESPN Tennis RSS |
-| ATP/WTA | `atp_wta.py` | 赛果网页抓取 + 今日赛程 |
+| RSS | `rss_news.py` | BBC Sport + ESPN Tennis |
+| ATP/WTA | `atp_wta.py` | 赛果 + 今日赛程（网页抓取） |
 | YouTube | `youtube.py` | 按频道 ID 查询 YouTube Data API v3 |
-| Twitter/X | `twitter.py` | Playwright 无头浏览器抓取（需登录，未登录仅抓固定推文） |
-| Instagram | `apify_instagram.py` | Apify API（需付费额度） |
-
-> [!NOTE]
-> Twitter/X 未登录用户只能看到固定推文（约 2020-2022 年）。如需抓取最新内容，需提供有效 Cookie 凭据。
+| Twitter/X | `twitter.py` | Playwright 无头浏览器抓取 |
+| Instagram | `apify_instagram.py` | Apify API |
 
 ## Testing
 
 ```bash
-# 运行全部测试
 pytest tests/ -v
-
-# 运行单个文件
-pytest tests/test_twitter.py -v
 ```
 
 测试使用 `unittest.mock.patch` 隔离外部依赖，无需真实 API Key。
@@ -137,30 +94,37 @@ pytest tests/test_twitter.py -v
 
 ```
 .
-├── config.yaml                  # 主配置文件
-├── requirements.txt             # Python 依赖
+├── .env.example               # 配置模板
+├── requirements.txt           # Python 依赖
 ├── src/
-│   ├── main.py                  # Pipeline 入口
-│   ├── config.py                 # 配置加载
-│   ├── data_sources/             # 数据源插件
-│   │   ├── base.py              # BaseDataSource + NewsItem
+│   ├── main.py                # Pipeline 入口
+│   ├── config.py              # 配置加载
+│   ├── time_utils.py          # 时间解析与日期范围过滤（CST）
+│   ├── debug_report.py        # Pipeline 追踪与调试报告
+│   ├── data_sources/          # 数据源插件
+│   │   ├── base.py            # BaseDataSource + NewsItem
 │   │   ├── rss_news.py
 │   │   ├── atp_wta.py
 │   │   ├── youtube.py
 │   │   ├── twitter.py
 │   │   └── apify_instagram.py
-│   ├── processor/               # 数据处理
+│   ├── processor/             # 数据处理
 │   │   ├── dedup.py
 │   │   ├── filter.py
 │   │   ├── recency.py
 │   │   ├── sorter.py
 │   │   └── ai_summary.py
-│   └── renderer/               # HTML 输出
+│   └── renderer/              # HTML 输出
 │       ├── daily_page.py
 │       └── index_page.py
-├── templates/                   # Jinja2 模板
+├── templates/                 # Jinja2 模板
 │   ├── daily.html
-│   └── index.html
-├── output/                      # 生成文件（git 跟踪）
-└── tests/                       # pytest 测试
+│   ├── index.html
+│   └── debug_report.html
+├── output/                    # 生成文件（gitignore）
+└── tests/                     # pytest 测试
 ```
+
+## License
+
+MIT

@@ -2,8 +2,13 @@ name: Daily Tennis News
 
 on:
   schedule:
-    - cron: "0 23 * * *"   # 北京时间 07:00 (UTC+8 = UTC-8h → 23:00 UTC)
+    - cron: "0 16 * * *"   # UTC 16:00 = 北京时间 00:00，T-1 模式采集前一天资讯
   workflow_dispatch:         # 支持手动触发
+    inputs:
+      target_date:
+        description: "目标日期 (YYYY-MM-DD)，留空则默认昨天"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -29,8 +34,18 @@ jobs:
 
       - name: Generate daily report
         env:
+          TARGET_DATE: ${{ github.event.inputs.target_date }}
+          # Secrets
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           APIFY_API_KEY: ${{ secrets.APIFY_API_KEY }}
+          # Non-secret config (defaults are in code, override here if needed)
+          PLAYERS: ${{ vars.PLAYERS }}
+          TOURNAMENTS: ${{ vars.TOURNAMENTS }}
+          AI_MODEL: ${{ vars.AI_MODEL }}
+          AI_BASE_URL: ${{ vars.AI_BASE_URL }}
+          AI_LANGUAGE: ${{ vars.AI_LANGUAGE }}
+          SOURCES_TWITTER: ${{ vars.SOURCES_TWITTER }}
         run: python src/main.py
 
       - name: Deploy to GitHub Pages
