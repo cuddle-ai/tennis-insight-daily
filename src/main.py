@@ -14,6 +14,7 @@ from src.data_sources.twitter import build_twitter_source
 from src.data_sources.youtube import build_youtube_source
 from src.debug_report import (
     render_debug_report,
+    serialize_item,
     serialize_items,
     summarize_items as summarize_trace_items,
     trace_dedup,
@@ -21,7 +22,7 @@ from src.debug_report import (
     trace_date_range,
 )
 from src.processor.ai_summary import generate_daily_intro, summarize_items
-from src.processor.filter import filter_by_config
+from src.processor.dedup import ai_dedup, dedup_items
 from src.processor.sorter import assign_weights, sort_items
 from src.renderer.daily_page import render_daily_page
 from src.renderer.index_page import render_index_page
@@ -90,38 +91,25 @@ def run_pipeline(
             source_traces.append(source_trace)
             all_items.extend(source_trace["raw_items"])
 
+    # AI client (used for dedup + summary)
+    api_key = cfg.get("ai", {}).get("api_key", "")
+    ai_cfg = cfg.get("ai", {})
+    model = ai_cfg.get("model", "qwen3.6-plus")
+    base_url = ai_cfg.get("base_url", "")
+    language = ai_cfg.get("language", "zh")
+
+    client = None
+    if api_key:
+        kwargs = {"api_key": api_key}
+        if base_url:
+            kwargs["base_url"] = base_url
+        client = openai.OpenAI(**kwargs)
+
     stage_traces = []
-    deduped_items, dedup_removed = trace_dedup(all_items, threshold=0.8)
-    stage_traces.append(
-        {
-            "name": "去重",
-            "description": "按标题相似度阈值 0.8 去除近似重复条目。",
-            "input_summary": summarize_trace_items(all_items),
-            "output_summary": summarize_trace_items(deduped_items),
-            "input_items": serialize_items(all_items),
-            "output_items": serialize_items(deduped_items),
-            "removed": dedup_removed,
-            "since": "",
-        }
-    )
 
-    filtered_items = filter_by_config(deduped_items, cfg, section="players")
-    stage_traces.append(
-        {
-            "name": "偏好过滤",
-            "description": "当前不过滤条目，players 和 tournaments 仅作为排序偏好信号。",
-            "input_summary": summarize_trace_items(deduped_items),
-            "output_summary": summarize_trace_items(filtered_items),
-            "input_items": serialize_items(deduped_items),
-            "output_items": serialize_items(filtered_items),
-            "removed": [],
-            "since": "",
-        }
-    )
-
-    # T-1 date-range filter: only keep items from target_date
+    # 1. 日期过滤：先过滤非目标日期条目，减少后续处理量
     date_range_items, date_range_removed, range_label = trace_date_range(
-        filtered_items,
+        all_items,
         start=start_utc,
         end=end_utc,
     )
@@ -129,41 +117,61 @@ def run_pipeline(
         {
             "name": "日期范围",
             "description": f"仅保留目标日期 {target_date.isoformat()} 的条目；无法解析时间的条目默认保留。",
-            "input_summary": summarize_trace_items(filtered_items),
+            "input_summary": summarize_trace_items(all_items),
             "output_summary": summarize_trace_items(date_range_items),
-            "input_items": serialize_items(filtered_items),
+            "input_items": serialize_items(all_items),
             "output_items": serialize_items(date_range_items),
             "removed": date_range_removed,
             "since": range_label,
         }
     )
 
+    # 2. 加权（去重前赋权，让 ai_dedup 能保留最高权重条目）
     weighted_items = assign_weights(date_range_items, cfg)
-    all_items = sort_items(weighted_items)
+
+    # 3. 去重
+    if client:
+        try:
+            deduped_items = ai_dedup(weighted_items, client=client, model=model)
+            kept_ids = {id(item) for item in deduped_items}
+            dedup_removed = [
+                {"item": serialize_item(item), "reason": "AI 语义去重"}
+                for item in weighted_items if id(item) not in kept_ids
+            ]
+        except Exception as exc:
+            print(f"AI 去重失败，回退到相似度去重: {exc}")
+            deduped_items, dedup_removed = trace_dedup(weighted_items, threshold=0.8)
+    else:
+        deduped_items, dedup_removed = trace_dedup(weighted_items, threshold=0.8)
+    stage_traces.append(
+        {
+            "name": "去重",
+            "description": "AI 语义去重：识别描述同一事件的不同标题。" if client else "按标题相似度阈值 0.8 去除近似重复条目。",
+            "input_summary": summarize_trace_items(weighted_items),
+            "output_summary": summarize_trace_items(deduped_items),
+            "input_items": serialize_items(weighted_items),
+            "output_items": serialize_items(deduped_items),
+            "removed": dedup_removed,
+            "since": "",
+        }
+    )
+
+    # 4. 排序
+    all_items = sort_items(deduped_items)
     stage_traces.append(
         {
             "name": "排序",
             "description": "应用偏好权重和时效权重后，按权重从高到低排序。",
-            "input_summary": summarize_trace_items(date_range_items),
+            "input_summary": summarize_trace_items(deduped_items),
             "output_summary": summarize_trace_items(all_items),
-            "input_items": serialize_items(date_range_items),
+            "input_items": serialize_items(deduped_items),
             "output_items": serialize_items(all_items),
             "removed": [],
             "since": "",
         }
     )
 
-    api_key = cfg.get("ai", {}).get("api_key", "")
-    ai_cfg = cfg.get("ai", {})
-    model = ai_cfg.get("model", "qwen3.6-plus")
-    base_url = ai_cfg.get("base_url", "")
-    language = ai_cfg.get("language", "zh")
-
-    if api_key:
-        kwargs = {"api_key": api_key}
-        if base_url:
-            kwargs["base_url"] = base_url
-        client = openai.OpenAI(**kwargs)
+    if client:
         try:
             all_items = summarize_items(all_items, client=client, model=model, language=language)
             intro = generate_daily_intro(all_items, client=client, model=model, language=language)
