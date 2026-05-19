@@ -9,15 +9,39 @@ MASTERS = {"Indian Wells", "Miami", "Monte Carlo", "Madrid", "Rome",
 
 
 def _recency_bonus(published_at: str, target: date) -> int:
-    """Bonus for items published later in the target day (afternoon > morning)."""
     dt = parse_datetime(published_at)
     if dt is None:
         return 0
-    # Items published after 18:00 UTC on the target day get extra weight
     afternoon_cutoff = datetime(target.year, target.month, target.day, 18, tzinfo=timezone.utc)
     if dt >= afternoon_cutoff:
         return 10
     return 0
+
+
+def _player_tokens(players: list[str]) -> set[str]:
+    tokens = set()
+    for name in players:
+        for part in name.lower().split():
+            if len(part) > 2:
+                tokens.add(part)
+    return tokens
+
+
+def _tournament_aliases(tournaments: list[str]) -> set[str]:
+    aliases = set()
+    for t in tournaments:
+        aliases.add(t.lower())
+    # common aliases
+    mapping = {
+        "roland garros": {"french open", "法网"},
+        "wimbledon": {"温网"},
+        "us open": {"美网", "flushing meadows"},
+        "australian open": {"澳网", "melbourne"},
+    }
+    for t in tournaments:
+        for alias in mapping.get(t.lower(), ()):
+            aliases.add(alias)
+    return aliases
 
 
 def assign_weights(items: list[NewsItem], cfg: dict, target: date | None = None) -> list[NewsItem]:
@@ -25,11 +49,13 @@ def assign_weights(items: list[NewsItem], cfg: dict, target: date | None = None)
         target = date.today() - timedelta(days=1)
 
     followed_players = {p.lower() for p in cfg.get("players", [])}
-    followed_tournaments = {t.lower() for t in cfg.get("tournaments", [])}
+    player_tokens = _player_tokens(cfg.get("players", []))
+    tournament_aliases = _tournament_aliases(cfg.get("tournaments", []))
 
     for item in items:
         w = item.weight
 
+        # media type bonus
         if item.media_type == "match_result":
             item_tournaments = {t.lower() for t in item.tournaments}
             if item_tournaments & {t.lower() for t in GRAND_SLAMS}:
@@ -39,18 +65,20 @@ def assign_weights(items: list[NewsItem], cfg: dict, target: date | None = None)
             else:
                 w += 40
 
+        if item.media_type == "schedule":
+            w += 35
+
+        # followed players/tournaments from item metadata
         item_players = {p.lower() for p in item.players}
         if item_players & followed_players:
             w += 50
 
+        # followed players/tournaments from title text
         title_lower = item.title.lower()
-        if any(t.lower() in title_lower for t in followed_tournaments):
+        if any(alias in title_lower for alias in tournament_aliases):
             w += 30
-        if any(p.lower() in title_lower for p in followed_players):
+        if any(token in title_lower for token in player_tokens):
             w += 20
-
-        if item.media_type == "schedule":
-            w += 35
 
         w += _recency_bonus(item.published_at, target)
 

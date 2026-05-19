@@ -75,8 +75,7 @@ class YouTubeSource(BaseDataSource):
 def build_youtube_source(cfg: dict) -> list[YouTubeSource]:
     if not cfg.get("sources", {}).get("youtube", True):
         return []
-    import os
-    api_key = os.environ.get("YOUTUBE_API_KEY", "")
+    api_key = cfg.get("youtube", {}).get("api_key", "")
     if not api_key:
         return []
 

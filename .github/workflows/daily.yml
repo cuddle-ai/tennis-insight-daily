@@ -34,6 +34,7 @@ jobs:
 
       - name: Generate daily report
         env:
+          PYTHONPATH: .
           TARGET_DATE: ${{ github.event.inputs.target_date }}
           # Secrets
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
@@ -46,7 +47,6 @@ jobs:
           AI_BASE_URL: ${{ vars.AI_BASE_URL }}
           AI_LANGUAGE: ${{ vars.AI_LANGUAGE }}
           SOURCES_TWITTER: ${{ vars.SOURCES_TWITTER }}
-          PYTHONPATH: .
         run: python src/main.py
 
       - name: Deploy to GitHub Pages
